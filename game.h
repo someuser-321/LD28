@@ -1,4 +1,0 @@
-
-
-void gametick();
-void shoot();
