@@ -29,7 +29,7 @@
 
 #define MAX_PROJECTILES 64
 #define MAX_ENEMIES 32
-#define NUM_BUILDINGS 4096
+#define NUM_BUILDINGS 2048
 
 #define BUILDING_SEED 42
 
@@ -271,7 +271,8 @@ void render()
 
     glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
     glTranslatef(pos_x, pos_y, pos_z);
-
+    
+    
     glLineWidth(1.0f);
     glBegin(GL_LINES);
 
@@ -382,15 +383,31 @@ void makeBuildings(int buildingCount)
     for ( int i=0 ; i<buildingCount ; i++ )
     {
         Building tmp;
-        tmp.x = (rand()%2000)/10.0f - 100.0f;
-        tmp.y = (rand()%2000)/10.0f - 100.0f;
-        //tmp.x_ = tmp.x + 1.0f;
-        //tmp.y_ = tmp.y + 1.0f;
-        tmp.x_ = tmp.x + 1; //rand()%2 ? (rand()%100)/-1000.0f : (rand()%100)/1000.0f;
-        tmp.y_ = tmp.y + 1; //rand()%2 ? (rand()%100)/-1000.0f : (rand()%100)/1000.0f;
-        tmp.height = (rand()%80)/10.0f + 0.1f;
+        tmp.x = rand()%200 - 100.0f;
+        tmp.y = rand()%200 - 100.0f;
         
-        grid[(int)tmp.x_+100][(int)tmp.y_+100] = true;
+        if ( tmp.x < 5 && tmp.x > -5 && tmp.y < 5 && tmp.y > -5)
+            continue;
+        
+        int size = rand()%190/10+1;
+        int ds;
+
+        if ( size > 1 )
+            ds = 1;
+        if ( size > 10 )
+            ds = 2;
+        if ( size > 15 )
+            ds = 4;
+        
+        tmp.height = size;
+        tmp.x_ = (tmp.x + ds) > 100 ? 100 : (tmp.x + ds);
+        tmp.y_ = (tmp.y + ds) > 100 ? 100 : (tmp.y + ds);
+        
+        for ( int i=tmp.x ; i<tmp.x_ ; i++ ) {
+            for ( int j=tmp.y ; j<tmp.y_ ; j++ ) {
+                grid[i+100][j+100] = true;
+            }
+        }
         
         buildings[i] = tmp;
     }
@@ -408,6 +425,7 @@ void makeEnemy()
             enemies[i].y = y;
             enemies[i].angle = RAD2DEG(atan2(pos_y-y, pos_x-x));
             enemies[i].alive = true;
+            break;
         }
     }
 }
