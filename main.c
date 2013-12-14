@@ -31,13 +31,17 @@
 #define MAX_ENEMIES 32
 #define NUM_BUILDINGS 4096
 
+#define BUILDING_SEED 42
 
-#define sleepytime(x) for(int i=0;i<x;i++){}
 
+#define sleepytime(x) for(int i=0;i<x;i++){}    // usleep and microsleep are too finicky...
+                                                // I apologize if you have a terrible computer
 
 typedef struct {
     float x, y;
     float angle;
+    bool alive;
+    int obj_x, obj_y;
 } Enemy;
 
 typedef struct {
@@ -45,6 +49,7 @@ typedef struct {
     float speed;
     float angle;
     float alive_time;
+    bool alive;
 } Projectile;
 
 typedef struct {
@@ -60,7 +65,6 @@ double tv0, Tdel;
 
 float rot_y;
 float pos_x, pos_y, pos_z;
-
 int width, height;
 float ratio;
 double cursor_x, cursor_y;
@@ -74,18 +78,29 @@ bool speed_increased = false;
 Enemy enemies[MAX_ENEMIES];
 Projectile projectiles[MAX_PROJECTILES];
 Building buildings[NUM_BUILDINGS];
+bool grid[200][200];
 
-int numEnemies = 0;
-int numProjectiles = 0;
 int numBuildings = 0;
+int numProjectiles = 0;
+int numEnemies = 0;
+
+int building_seed = BUILDING_SEED;
+int next_seed;
+
+int ticks = 0;
 
 
 void setup();
 void render_setup();
+
 void makeBuildings(int buildingCount);
+void makeEnemy();
 
 void step();
+void moveEnemies();
+
 void get_input();
+
 void render();
 void drawBuildings();
 
@@ -98,6 +113,9 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 int main(int argc, char *argv[])
 {
+    if ( argc > 1)
+        building_seed = atoi(argv[1]);
+    
     glfwSetErrorCallback(error_callback);
 
     if ( !glfwInit() )
@@ -135,13 +153,18 @@ void setup()
 
     tv0 = glfwGetTime();
     
+    srand(building_seed);
+    next_seed = rand();
+    
     numBuildings = NUM_BUILDINGS;
     makeBuildings(numBuildings);
 
+    
     rot_y = 0.0f;
     pos_x = 0.0f;
     pos_y = -8.0f;
     pos_z = 0.0f;
+
 }
 
 void render_setup()
@@ -178,9 +201,25 @@ void step()
 {
     glfwPollEvents();
     get_input(window);
+    
+    if ( pos_x > 100 || pos_x < -100 || pos_z > 100 || pos_z < -100 )
+    {
+        printf("You fell off the edge and died. Good job.\n");
+        building_seed = next_seed;
+        next_seed = rand();
+        makeBuildings(numBuildings);
+        pos_x = pos_z = 0;
+        pos_y = -8.0f;
+    }
+    
+    if ( ticks%10 == 0)
+        makeEnemy();
+    ticks++;
+    
+    moveEnemies();
 
     char title[64];
-    sprintf(title, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
+    snprintf(title, 64, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
     glfwSetWindowTitle(window, title);
 }
 
@@ -203,6 +242,10 @@ void get_input()
     }
     if ( glfwGetKey(window, 'E') == GLFW_PRESS ) {
         capture_cursor = !capture_cursor;
+        sleepytime(31415926);
+    }
+    if ( glfwGetKey(window, 'R') == GLFW_PRESS ) {
+        pos_x = 9001.0f;
         sleepytime(31415926);
     }
 
@@ -245,8 +288,7 @@ void render()
         glVertex3f(0.0f, 0.0f, 1.0f);
 
     glEnd();
-    
-    glLineWidth(1.0f);
+
     glColor3f(0.8f, 0.8f, 0.8f);
     glBegin(GL_LINES);
         for ( int i=-100 ; i<100 ; i++ ) {
@@ -266,6 +308,7 @@ void render()
         {
             float x = enemies[i].x;
             float y = enemies[i].y;
+
             glPushMatrix();
             glRotatef(enemies[i].angle, 0.0f, 1.0f, 0.0f);
             glVertex3f(-0.05f + x, 0.0f, -0.05f + y);
@@ -280,7 +323,9 @@ void render()
             float x = projectiles[i].x;
             float y = projectiles[i].y;
             float d = projectiles[i].alive_time;
+               
             glColor3f(1.0f, 1.0f/d, 1.0f/d);
+            
             glPushMatrix();
             glRotatef(projectiles[i].angle, 0.0f, 1.0f, 0.0f);
             glVertex3f(-0.05f + x, 0.0f, -0.05f + y);
@@ -328,58 +373,135 @@ void render()
 
 void makeBuildings(int buildingCount)
 {
+    for ( int i=0 ; i<200 ; i++ ) {
+        for ( int j=0 ; j<200 ; j++ ) {
+            grid[i][j] = false;
+        }
+    }
+    
     for ( int i=0 ; i<buildingCount ; i++ )
     {
         Building tmp;
         tmp.x = (rand()%2000)/10.0f - 100.0f;
         tmp.y = (rand()%2000)/10.0f - 100.0f;
-        tmp.x_ = tmp.x + 1.0f;
-        tmp.y_ = tmp.y + 1.0f;
-        //tmp.x_ = tmp.x + max((rand()%40)/10.0f, 0.25f) - 2.0f;
-        //tmp.y_ = tmp.y + max((rand()%40)/10.0f, 0.25f) - 2.0f;
-        tmp.height = (rand()%80)/10.0f;
+        //tmp.x_ = tmp.x + 1.0f;
+        //tmp.y_ = tmp.y + 1.0f;
+        tmp.x_ = tmp.x + 1; //rand()%2 ? (rand()%100)/-1000.0f : (rand()%100)/1000.0f;
+        tmp.y_ = tmp.y + 1; //rand()%2 ? (rand()%100)/-1000.0f : (rand()%100)/1000.0f;
+        tmp.height = (rand()%80)/10.0f + 0.1f;
+        
+        grid[(int)tmp.x_+100][(int)tmp.y_+100] = true;
         
         buildings[i] = tmp;
     }
 }
 
+void makeEnemy()
+{
+    int i;
+    for ( i=0 ; i<numEnemies ; i++ ) {
+        if ( !enemies[i].alive ) {
+            int x = (int)pos_x + rand()%16 - 8;
+            int y = (int)pos_y + rand()%16 - 8;
+    
+            enemies[i].x = x;
+            enemies[i].y = y;
+            enemies[i].angle = RAD2DEG(atan2(pos_y-y, pos_x-x));
+            enemies[i].alive = true;
+        }
+    }
+}
+
+void moveEnemies()
+{
+    for ( int i=0 ; i<numEnemies ; i++ )
+    {
+        if ( enemies[i].alive )
+        {
+            float x = enemies[i].x;
+            float y = enemies[i].y;
+            float angle = enemies[i].angle;
+            
+            if ( (angle < 45.0f && angle > -45.0f) || (angle > 135.0f && angle < -135.0f) ) {
+                //movesideways
+                enemies[i].x -= (pos_x - x)/4 * Tdel;
+            } else {
+                //moveupdown
+                enemies[i].y -= (pos_y - y)/4 * Tdel;
+            }
+            
+            enemies[i].angle = RAD2DEG(atan2(pos_y-y, pos_x-x));
+        }
+    }
+}
+
 void drawBuildings()
 {
-    glColor3f(0.5f, 0.5f, 0.5f);
-    
-    for ( int i=0 ; i<numBuildings ; i++ )
-    {
+    glBegin(GL_QUADS);
+    for ( int i=0 ; i<numBuildings ; i++ ) {
         float x = buildings[i].x;
         float y = buildings[i].y;
         float x_ = buildings[i].x_;
         float y_ = buildings[i].y_;
         float height = buildings[i].height;
+        
+        glColor3f(0.5f, 0.5f, 0.5f);
+        glVertex3f(x, 0.0f,  y);
+        glVertex3f(x, height, y);
+        glVertex3f(x, height, y_);
+        glVertex3f(x, 0.0f,  y_);
     
+        glVertex3f(x, 0.0f,  y_);
+        glVertex3f(x, height, y_);
+        glVertex3f(x_, height, y_);
+        glVertex3f(x_, 0.0f,  y_);
+    
+        glVertex3f(x_, 0.0f,  y);
+        glVertex3f(x_, height, y);
+        glVertex3f(x_, height, y_);
+        glVertex3f(x_, 0.0f,  y_);
+    
+        glVertex3f(x, 0.0f,  y);
+        glVertex3f(x, height, y);
+        glVertex3f(x_, height, y);
+        glVertex3f(x_, 0.0f,  y);
+        
+        glColor3f(0.45f, 0.45f, 0.45f);
         glVertex3f(x , height,  y);
         glVertex3f(x , height, y_);
         glVertex3f(x_, height, y_);
         glVertex3f(x_, height,  y);
-    
-        glVertex3f(x, 0.0f,  y);
-        glVertex3f(x, height, y);
-        glVertex3f(x, height, y_);
-        glVertex3f(x, 0.0f,  y_);
-    
-        glVertex3f(x, 0.0f,  y_);
-        glVertex3f(x, height, y_);
-        glVertex3f(x_, height, y_);
-        glVertex3f(x_, 0.0f,  y_);
-    
-        glVertex3f(x_, 0.0f,  y);
-        glVertex3f(x_, height, y);
-        glVertex3f(x_, height, y_);
-        glVertex3f(x_, 0.0f,  y_);
-    
-        glVertex3f(x, 0.0f,  y);
-        glVertex3f(x, height, y);
-        glVertex3f(x_, height, y);
-        glVertex3f(x_, 0.0f,  y);
     }
+    glEnd();
+    
+    glColor3f(0.0f, 0.0f, 0.0f);
+    glBegin(GL_LINES);
+    for ( int i=0 ; i<numBuildings ; i++ ) {
+        float x = buildings[i].x;
+        float y = buildings[i].y;
+        float x_ = buildings[i].x_;
+        float y_ = buildings[i].y_;
+        float height = buildings[i].height;
+        
+        glVertex3f(x, height, y);//
+        glVertex3f(x_, height, y);
+        glVertex3f(x, height, y);//
+        glVertex3f(x, height, y_);
+        glVertex3f(x, height, y_);//
+        glVertex3f(x_, height, y_);
+        glVertex3f(x_, height, y);//
+        glVertex3f(x_, height, y_);
+        
+        glVertex3f(x, 0.0f, y);//
+        glVertex3f(x, height, y);
+        glVertex3f(x, 0.0f, y_);//
+        glVertex3f(x, height, y_);
+        glVertex3f(x_, 0.0f, y_);//
+        glVertex3f(x_, height, y_);
+        glVertex3f(x_, 0.0f, y);//
+        glVertex3f(x_, height, y);
+    }
+    glEnd();
 }
 
 void cleanup()
