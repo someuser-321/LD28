@@ -18,6 +18,7 @@
 #define DCOS(x) cos(DEG2RAD(x))
 
 #define max(x, y) (x>y?x:y)
+#define min(x, y) (x<y?x:y)
 
 #define TIMEDEL60 (1/(double)60)
 #define FOV DEG2RAD(60.0f)
@@ -27,9 +28,11 @@
 #define TURN_SPEED 120.0f       // degrees/sec
 #define MOUSE_SENSITIVITY 0.05f
 
-#define MAX_PROJECTILES 64
+#define MAX_PROJECTILES 4096
 #define MAX_ENEMIES 32
 #define NUM_BUILDINGS 2048
+
+#define PROJECTILE_SPEED 1.0f
 
 #define BUILDING_SEED 42
 
@@ -40,16 +43,15 @@
 typedef struct {
     float x, y;
     float angle;
-    bool alive;
     int obj_x, obj_y;
+    bool alive;
 } Enemy;
 
 typedef struct {
     float x, y;
-    float speed;
     float angle;
-    float alive_time;
     bool alive;
+    float alive_time;
 } Projectile;
 
 typedef struct {
@@ -83,6 +85,7 @@ bool grid[200][200];
 int numBuildings = 0;
 int numProjectiles = 0;
 int numEnemies = 0;
+int currentProjectile = 0;
 
 int building_seed = BUILDING_SEED;
 int next_seed;
@@ -95,14 +98,18 @@ void render_setup();
 
 void makeBuildings(int buildingCount);
 void makeEnemy();
+void addProjectile(float x, float y);
 
 void step();
 void moveEnemies();
+void moveProjectiles();
 
 void get_input();
 
 void render();
 void drawBuildings();
+
+void DIE(char *message);
 
 double getFPS();
 void cleanup();
@@ -204,12 +211,7 @@ void step()
     
     if ( pos_x > 100 || pos_x < -100 || pos_z > 100 || pos_z < -100 )
     {
-        printf("You fell off the edge and died. Good job.\n");
-        building_seed = next_seed;
-        next_seed = rand();
-        makeBuildings(numBuildings);
-        pos_x = pos_z = 0;
-        pos_y = -8.0f;
+        DIE("You fell off the edge and died. That was clever.");
     }
     
     if ( ticks%10 == 0)
@@ -217,6 +219,7 @@ void step()
     ticks++;
     
     moveEnemies();
+    moveProjectiles();
 
     char title[64];
     snprintf(title, 64, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
@@ -229,16 +232,20 @@ void get_input()
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
     if ( glfwGetKey(window, 'W') == GLFW_PRESS ) {
-        pos_z += MOVEMENT_SPEED * Tdel;
+        //if ( !grid[(int)pos_x+100][(int)pos_z+100+1] )
+            pos_z += MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'S') == GLFW_PRESS ) {
-        pos_z -= MOVEMENT_SPEED * Tdel;
+        //if ( !grid[(int)pos_x+100][(int)pos_z+100-1] )
+            pos_z -= MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'A') == GLFW_PRESS ) {
-        pos_x += MOVEMENT_SPEED * Tdel;
+        //if ( !grid[(int)pos_x+100-1][(int)pos_z+100] )
+            pos_x += MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'D') == GLFW_PRESS ) {
-        pos_x -= MOVEMENT_SPEED * Tdel;
+        //if ( !grid[(int)pos_x+100+1][(int)pos_z+100] )
+            pos_x -= MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'E') == GLFW_PRESS ) {
         capture_cursor = !capture_cursor;
@@ -247,6 +254,10 @@ void get_input()
     if ( glfwGetKey(window, 'R') == GLFW_PRESS ) {
         pos_x = 9001.0f;
         sleepytime(31415926);
+    }
+    
+    if ( glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ) {
+        addProjectile(-pos_x, -pos_z);
     }
 
     if ( glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ) {
@@ -307,38 +318,41 @@ void render()
         glColor3f(1.0f, 0.0f, 0.0f);
         for ( int i=0 ; i<numEnemies ; i++ )
         {
-            float x = enemies[i].x;
-            float y = enemies[i].y;
+            if ( enemies[i].alive )
+            {
+                float x = enemies[i].x;
+                float y = enemies[i].y;
 
-            glPushMatrix();
-            glRotatef(enemies[i].angle, 0.0f, 1.0f, 0.0f);
-            glVertex3f(-0.05f + x, 0.0f, -0.05f + y);
-            glVertex3f(-0.05f + x, 0.0f,  0.05f + y);
-            glVertex3f( 0.05f + x, 0.0f,  0.05f + y);
-            glVertex3f( 0.05f + x, 0.0f, -0.05f + y);
-            glPopMatrix();
+                glPushMatrix();
+                glRotatef(enemies[i].angle, 0.0f, 1.0f, 0.0f);
+                glVertex3f(-0.05f + x, 0.0f, -0.05f + y);
+                glVertex3f(-0.05f + x, 0.0f,  0.05f + y);
+                glVertex3f( 0.05f + x, 0.0f,  0.05f + y);
+                glVertex3f( 0.05f + x, 0.0f, -0.05f + y);
+                glPopMatrix();
+            }
         }
-        
+    glEnd();
+    
+    glPointSize(2.0f);
+    glBegin(GL_POINTS);
         for ( int i=0 ; i<numProjectiles ; i++ )
         {
-            float x = projectiles[i].x;
-            float y = projectiles[i].y;
-            float d = projectiles[i].alive_time;
+            if ( projectiles[i].alive )
+            {
+                float x = projectiles[i].x;
+                float y = projectiles[i].y;
+                float d = projectiles[i].alive_time;
                
-            glColor3f(1.0f, 1.0f/d, 1.0f/d);
-            
-            glPushMatrix();
-            glRotatef(projectiles[i].angle, 0.0f, 1.0f, 0.0f);
-            glVertex3f(-0.05f + x, 0.0f, -0.05f + y);
-            glVertex3f(-0.05f + x, 0.0f,  0.05f + y);
-            glVertex3f( 0.05f + x + d, 0.0f,  0.05f + y + d);
-            glVertex3f( 0.05f + x + d, 0.0f, -0.05f + y + d);
-            glPopMatrix();
+                glColor3f(1.0f, 1.0f/d, 1.0f/d);
+                glVertex3f(x, 0.0f, y);
+            }
             
         }
-        
-        drawBuildings();
+    glEnd();
     
+    glBegin(GL_QUADS);
+        drawBuildings();
     glEnd();
     
     glPushMatrix();
@@ -348,11 +362,15 @@ void render()
     glRotatef(rot_y, 0.0f, 1.0f, 0.0f);
     
     glColor3f(0.4f, 0.6f, 1.0f);
+    glPointSize(5.0f);
+    glBegin(GL_POINTS);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glEnd();
     glBegin(GL_QUADS);
-        glVertex3f(-0.05f, 0.0f, -0.05f);
-        glVertex3f(-0.05f, 0.0f,  0.05f);
-        glVertex3f( 0.05f, 0.0f,  0.05f);
-        glVertex3f( 0.05f, 0.0f, -0.05f);
+        glVertex3f(-0.075f, 0.0f, -0.075f);
+        glVertex3f(-0.075f, 0.0f,  0.075f);
+        glVertex3f( 0.075f, 0.0f,  0.075f);
+        glVertex3f( 0.075f, 0.0f, -0.075f);
     glEnd();
     glPopMatrix();
     
@@ -430,6 +448,55 @@ void makeEnemy()
     }
 }
 
+void addProjectile(float x, float y)
+{
+    Projectile tmp;
+    tmp.x = x;
+    tmp.y = y;
+    tmp.angle = -rot_y;
+    tmp.alive = true;
+    tmp.alive_time = 0.0f;
+    
+    projectiles[currentProjectile] = tmp;
+    currentProjectile = (currentProjectile+1) % MAX_PROJECTILES;
+    numProjectiles = min(numProjectiles+1, MAX_PROJECTILES);
+}
+
+void moveProjectiles()
+{
+    for ( int i=0 ; i<numProjectiles ; i++ )
+    {
+        if ( projectiles[i].alive )
+        {
+            projectiles[i].x += cosf(DEG2RAD(projectiles[i].angle)) * PROJECTILE_SPEED * Tdel;
+            projectiles[i].y += sinf(DEG2RAD(projectiles[i].angle)) * PROJECTILE_SPEED * Tdel;
+            
+            if ( grid[(int)projectiles[i].x+100-1][(int)projectiles[i].y+100] )
+            {
+                projectiles[i].alive = false;
+            }
+            if ( fabs(projectiles[i].x - pos_x) < 0.1f && fabs(projectiles[i].y - pos_z) < 0.1f )
+            {
+                DIE("You walked right into that bullet. Well done. I bet your parents are proud.");
+                break;
+            }
+            
+            for ( int j=0 ; j<numEnemies ; j++ )
+            {
+                if ( enemies[j].alive )
+                {
+                    if ( fabs(projectiles[i].x - enemies[j].x) < 0.25f && fabs(projectiles[i].y - enemies[j].y) < 0.25f ) {
+                        enemies[j].alive = false;
+                        break;
+                    }
+                }
+            }
+            
+            projectiles[i].alive_time += Tdel;
+        }
+    }
+}
+
 void moveEnemies()
 {
     for ( int i=0 ; i<numEnemies ; i++ )
@@ -451,6 +518,17 @@ void moveEnemies()
             enemies[i].angle = RAD2DEG(atan2(pos_y-y, pos_x-x));
         }
     }
+}
+
+void DIE(char *message)
+{
+    printf("%s\n", message);
+    building_seed = next_seed;
+    next_seed = rand();
+    makeBuildings(numBuildings);
+    pos_x = pos_z = 0;
+    pos_y = -8.0f;
+    
 }
 
 void drawBuildings()
