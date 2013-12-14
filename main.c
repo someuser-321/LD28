@@ -32,7 +32,7 @@
 #define MAX_ENEMIES 32
 #define NUM_BUILDINGS 2048
 
-#define PROJECTILE_SPEED 1.0f
+#define PROJECTILE_SPEED 4.0f
 
 #define BUILDING_SEED 42
 
@@ -165,11 +165,27 @@ void setup()
     
     numBuildings = NUM_BUILDINGS;
     makeBuildings(numBuildings);
+    
+    /*numBuildings = 2;
+    buildings[0].x = buildings[0].y = 2;
+    buildings[0].x_ = buildings[0].y_ = 4;
+    buildings[0].height = 8;
+    
+    grid[2+100][2+100] = true;
+    grid[2+100+1][2+100] = true;
+    grid[2+100+1][2+100+1] = true;
+    grid[2+100][2+100+1] = true;
 
+    buildings[1].x = buildings[1].y = -2;
+    buildings[1].x_ = buildings[1].y_ = -1;
+    buildings[1].height = 84;
+    
+    grid[100-2][100-2] = true;*/
+    
     
     rot_y = 0.0f;
     pos_x = 0.0f;
-    pos_y = -8.0f;
+    pos_y = 8.0f;
     pos_z = 0.0f;
 
 }
@@ -232,20 +248,20 @@ void get_input()
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
     if ( glfwGetKey(window, 'W') == GLFW_PRESS ) {
-        //if ( !grid[(int)pos_x+100][(int)pos_z+100+1] )
-            pos_z += MOVEMENT_SPEED * Tdel;
-    }
-    if ( glfwGetKey(window, 'S') == GLFW_PRESS ) {
-        //if ( !grid[(int)pos_x+100][(int)pos_z+100-1] )
+        if ( !grid[(int)pos_x+100][(int)(pos_z-0.15f)+100] )
             pos_z -= MOVEMENT_SPEED * Tdel;
     }
+    if ( glfwGetKey(window, 'S') == GLFW_PRESS ) {
+        if ( !grid[(int)pos_x+100][(int)ceil(pos_z+0.15f)+100-1] )
+            pos_z += MOVEMENT_SPEED * Tdel;
+    }
     if ( glfwGetKey(window, 'A') == GLFW_PRESS ) {
-        //if ( !grid[(int)pos_x+100-1][(int)pos_z+100] )
-            pos_x += MOVEMENT_SPEED * Tdel;
+        if ( !grid[(int)(pos_x-0.15f)+100][(int)pos_z+100] )
+            pos_x -= MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'D') == GLFW_PRESS ) {
-        //if ( !grid[(int)pos_x+100+1][(int)pos_z+100] )
-            pos_x -= MOVEMENT_SPEED * Tdel;
+        if ( !grid[(int)ceil(pos_x+0.15f)+100-1][(int)pos_z+100] )
+            pos_x += MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'E') == GLFW_PRESS ) {
         capture_cursor = !capture_cursor;
@@ -256,8 +272,13 @@ void get_input()
         sleepytime(31415926);
     }
     
+    if ( glfwGetKey(window, 'Q') == GLFW_PRESS ) {
+        printf("x=%.2f, y=%.2f, z=%.2f\n", pos_x, pos_y, pos_z);
+    }
+    
     if ( glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ) {
-        addProjectile(-pos_x, -pos_z);
+        addProjectile(pos_x+cosf(DEG2RAD(-rot_y))/4, pos_z+sinf(DEG2RAD(-rot_y))/4);
+        sleepytime(3141592);
     }
 
     if ( glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ) {
@@ -278,10 +299,10 @@ void render()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     glLoadIdentity();
-    glPushMatrix();    
+    glPushMatrix();
 
     glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
-    glTranslatef(pos_x, pos_y, pos_z);
+    glTranslatef(-pos_x, -pos_y, -pos_z);
     
     
     glLineWidth(1.0f);
@@ -357,7 +378,7 @@ void render()
     
     glPushMatrix();
     
-    glTranslatef(-pos_x, 0.0f, -pos_z);
+    glTranslatef(pos_x, 0.0f, pos_z);
     glPushMatrix();
     glRotatef(rot_y, 0.0f, 1.0f, 0.0f);
     
@@ -401,17 +422,15 @@ void makeBuildings(int buildingCount)
     for ( int i=0 ; i<buildingCount ; i++ )
     {
         Building tmp;
-        tmp.x = rand()%200 - 100.0f;
-        tmp.y = rand()%200 - 100.0f;
+        tmp.x = rand()%200 - 100;
+        tmp.y = rand()%200 - 100;
         
         if ( tmp.x < 5 && tmp.x > -5 && tmp.y < 5 && tmp.y > -5)
             continue;
         
         int size = rand()%190/10+1;
-        int ds;
+        int ds = 1;
 
-        if ( size > 1 )
-            ds = 1;
         if ( size > 10 )
             ds = 2;
         if ( size > 15 )
@@ -421,8 +440,8 @@ void makeBuildings(int buildingCount)
         tmp.x_ = (tmp.x + ds) > 100 ? 100 : (tmp.x + ds);
         tmp.y_ = (tmp.y + ds) > 100 ? 100 : (tmp.y + ds);
         
-        for ( int i=tmp.x ; i<tmp.x_ ; i++ ) {
-            for ( int j=tmp.y ; j<tmp.y_ ; j++ ) {
+        for ( int i=floor(tmp.x) ; i<floor(tmp.x_) ; i++ ) {
+            for ( int j=floor(tmp.y) ; j<floor(tmp.y_) ; j++ ) {
                 grid[i+100][j+100] = true;
             }
         }
@@ -471,11 +490,11 @@ void moveProjectiles()
             projectiles[i].x += cosf(DEG2RAD(projectiles[i].angle)) * PROJECTILE_SPEED * Tdel;
             projectiles[i].y += sinf(DEG2RAD(projectiles[i].angle)) * PROJECTILE_SPEED * Tdel;
             
-            if ( grid[(int)projectiles[i].x+100-1][(int)projectiles[i].y+100] )
+            if ( grid[(int)projectiles[i].x+100][(int)projectiles[i].y+100] )
             {
                 projectiles[i].alive = false;
             }
-            if ( fabs(projectiles[i].x - pos_x) < 0.1f && fabs(projectiles[i].y - pos_z) < 0.1f )
+            if ( fabs(projectiles[i].x - pos_x) < 0.075f && fabs(projectiles[i].y - pos_z) < 0.075f )
             {
                 DIE("You walked right into that bullet. Well done. I bet your parents are proud.");
                 break;
@@ -527,7 +546,12 @@ void DIE(char *message)
     next_seed = rand();
     makeBuildings(numBuildings);
     pos_x = pos_z = 0;
-    pos_y = -8.0f;
+    pos_y = 8.0f;
+    
+    for ( int i=0 ; i<MAX_PROJECTILES ; i++ )
+        projectiles[i].alive = false;
+    for ( int i=0 ; i<MAX_ENEMIES ; i++ )
+        enemies[i].alive = false;
     
 }
 
