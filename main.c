@@ -248,19 +248,19 @@ void get_input()
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
     if ( glfwGetKey(window, 'W') == GLFW_PRESS ) {
-        if ( !grid[(int)pos_x+100][(int)(pos_z-0.15f)+100] )
+        if ( !grid[(int)(pos_x+100)][(int)(pos_z-0.15f+100)] )
             pos_z -= MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'S') == GLFW_PRESS ) {
-        if ( !grid[(int)pos_x+100][(int)ceil(pos_z+0.15f)+100-1] )
+        if ( !grid[(int)(pos_x+100)][(int)ceil(pos_z+0.15f+100-1)] )
             pos_z += MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'A') == GLFW_PRESS ) {
-        if ( !grid[(int)(pos_x-0.15f)+100][(int)pos_z+100] )
+        if ( !grid[(int)(pos_x-0.15f+100)][(int)(pos_z+100)] )
             pos_x -= MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'D') == GLFW_PRESS ) {
-        if ( !grid[(int)ceil(pos_x+0.15f)+100-1][(int)pos_z+100] )
+        if ( !grid[(int)ceil(pos_x+0.15f+100-1)][(int)(pos_z+100)] )
             pos_x += MOVEMENT_SPEED * Tdel;
     }
     if ( glfwGetKey(window, 'E') == GLFW_PRESS ) {
