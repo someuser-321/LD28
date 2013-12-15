@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
+#include <time.h>
 
 #include <GLFW/glfw3.h>
 
@@ -99,7 +100,7 @@ float score = 0.0f;
 float enemy_speed = ENEMY_SPEED;
 float initial_enemy_speed = ENEMY_SPEED;
 
-int building_seed = BUILDING_SEED;
+int building_seed;// = BUILDING_SEED;
 int next_seed;
 
 int ticks = 0;
@@ -126,15 +127,20 @@ void DIE(char *message);
 double getFPS();
 void cleanup();
 
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void error_callback(int error, const char *description);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 
 int main(int argc, char *argv[])
 {
-    if ( argc == 2 )
+    if ( argc == 2 ) {
         building_seed = atoi(argv[1]);
-    
+    } else {
+        srand(time(NULL));
+        building_seed = rand();
+    }
+        
     glfwSetErrorCallback(error_callback);
 
     if ( !glfwInit() )
@@ -149,6 +155,16 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    glfwSetScrollCallback(window, scroll_callback);
+    
+    printf("You Only Get One - LD28\n\n");
+    printf("The aim of this game is to fight your way through the red squares to the gree objective marker indicated by the green line.\n");
+    printf("Everything else should be self-explanatory.\n\n");
+    printf("Controls (YOGO)  :\n\tmouse: aim\n\tleft-click: shoot\n\tright-click: move forward\n\tscroll: zoom\n\n");
+    printf("Controls (casual):\n\tWASD: movement\n\tmouse: aim\n\tspace: shoot\n\tscroll/shift/ctrl: zoom\n\n");
+    printf("Have fun! Made by Chris Harrison (and coffee), December 2013\n\n");
+    
+    pos_y = 8.0f;
     setup();
     render_setup();
 
@@ -171,42 +187,13 @@ void setup()
     glfwSetCursorPos(window, width/2, height/2);
 
     tv0 = glfwGetTime();
-    
+
     srand(building_seed);
     next_seed = rand();
-    
+
     numBuildings = NUM_BUILDINGS;
     makeBuildings(numBuildings);
-    
-    /*numBuildings = 4;
-    buildings[0].x = buildings[0].y = 2;
-    buildings[0].x_ = buildings[0].y_ = 3;
-    buildings[0].height = 8;
-    
-    grid[100+2][100+2] = true;
 
-    buildings[1].x = buildings[1].y = -2;
-    buildings[1].x_ = buildings[1].y_ = -1;
-    buildings[1].height = 8;
-    
-    grid[100-2][100-2] = true;
-    
-    buildings[2].x = -2;
-    buildings[2].y = 2;
-    buildings[2].x_ = -1;
-    buildings[2].y_ = 3;
-    buildings[2].height = 8;
-    
-    grid[100-2][100+2] = true;
-    
-    buildings[3].x = 2;
-    buildings[3].y = -2;
-    buildings[3].x_ = 3;
-    buildings[3].y_ = -1;
-    buildings[3].height = 8;
-    
-    grid[100+2][100-2] = true;*/
-    
     do {
         objective.x = rand()%200-100;
         objective.y = rand()%200-100;
@@ -214,8 +201,6 @@ void setup()
     } while ( (grid[(int)objective.x+100][(int)objective.y+100] || grid[(int)objective.x+100-1][(int)objective.y+100] ||
               grid[(int)objective.x+100-1][(int)objective.y+100-1] || grid[(int)objective.x+100][(int)objective.y+100-1]) &&
               (abs(objective.x) < 90 && abs(objective.y) < 90) );
-    
-    printf("Objective: x=%.2f, y=%.2f\n", objective.x, objective.y);
 
     for ( int i=0 ; i<MAX_ENEMIES ; i++ )
     {
@@ -225,7 +210,7 @@ void setup()
     
     rot_y = 0.0f;
     pos_x = 0.0f;
-    pos_y = 8.0f;
+    //pos_y = 8.0f;
     pos_z = 0.0f;
 
 }
@@ -352,6 +337,25 @@ void get_input()
         rot_y = -RAD2DEG(atan2(cursor_y, cursor_x));
         glfwSetCursorPos(window, width/2, height/2);
     }
+    if ( glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS ) {
+        if ( ticks%4 == 0 )
+            addProjectile(pos_x+cosf(DEG2RAD(-rot_y))/4, pos_z+sinf(DEG2RAD(-rot_y))/4);
+    }
+    if ( glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS ) {
+        
+        if ( !grid[(int)(pos_x+100)][(int)(pos_z-0.15f+100)] && rot_y > 0.0f ){         // W
+            pos_z -= sinf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+        }
+        if ( !grid[(int)(pos_x+100)][(int)ceil(pos_z+0.2f+100-1)] && rot_y < 0.0f) {  // S
+            pos_z -= sinf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+        }
+        if ( !grid[(int)(pos_x-0.2f+100)][(int)(pos_z+100)] && (rot_y > 90.0f || rot_y < -90.0f) ) {        // A
+            pos_x += cosf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+        }
+        if ( !grid[(int)ceil(pos_x+0.15f+100-1)][(int)(pos_z+100)] && rot_y < 90.0f && rot_y > -90.0f ) {  // D
+            pos_x += cosf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+        }
+    }
 }
 
 void render()
@@ -396,7 +400,7 @@ void render()
     glLineWidth(1.0f);
     glBegin(GL_LINES);
     
-        glColor3f(5.0f/max(pos_y, 5), 5.0f/max(pos_y, 5), 5.0f/max(pos_y, 5));
+        glColor3f(5.0f/max(pos_y, 4), 5.0f/max(pos_y, 4), 5.0f/max(pos_y, 4));
         for ( int i=-100 ; i<100 ; i++ ) {
             glVertex3f(i, -0.1f, -100.0f);
             glVertex3f(i, -0.1f,  100.0f);
@@ -724,6 +728,14 @@ void drawBuildings()
 void cleanup()
 {
     glfwTerminate();
+}
+
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    if ( yoffset < 0 && pos_y < 128 )
+        pos_y /= -yoffset/1.1f;
+    else if ( yoffset > 0 && pos_y > 4 )
+        pos_y *= yoffset/1.1f;
 }
 
 void error_callback(int error, const char *description)
