@@ -32,7 +32,7 @@
 #define MAX_ENEMIES 32
 #define NUM_BUILDINGS 2048
 
-#define PROJECTILE_SPEED 4.0f
+#define PROJECTILE_SPEED 8.0f
 
 #define BUILDING_SEED 42
 
@@ -166,21 +166,34 @@ void setup()
     numBuildings = NUM_BUILDINGS;
     makeBuildings(numBuildings);
     
-    /*numBuildings = 2;
+    /*numBuildings = 4;
     buildings[0].x = buildings[0].y = 2;
-    buildings[0].x_ = buildings[0].y_ = 4;
+    buildings[0].x_ = buildings[0].y_ = 3;
     buildings[0].height = 8;
     
-    grid[2+100][2+100] = true;
-    grid[2+100+1][2+100] = true;
-    grid[2+100+1][2+100+1] = true;
-    grid[2+100][2+100+1] = true;
+    grid[100+2][100+2] = true;
 
     buildings[1].x = buildings[1].y = -2;
     buildings[1].x_ = buildings[1].y_ = -1;
-    buildings[1].height = 84;
+    buildings[1].height = 8;
     
-    grid[100-2][100-2] = true;*/
+    grid[100-2][100-2] = true;
+    
+    buildings[2].x = -2;
+    buildings[2].y = 2;
+    buildings[2].x_ = -1;
+    buildings[2].y_ = 3;
+    buildings[2].height = 8;
+    
+    grid[100-2][100+2] = true;
+    
+    buildings[3].x = 2;
+    buildings[3].y = -2;
+    buildings[3].x_ = 3;
+    buildings[3].y_ = -1;
+    buildings[3].height = 8;
+    
+    grid[100+2][100-2] = true;*/
     
     
     rot_y = 0.0f;
@@ -490,7 +503,12 @@ void moveProjectiles()
             projectiles[i].x += cosf(DEG2RAD(projectiles[i].angle)) * PROJECTILE_SPEED * Tdel;
             projectiles[i].y += sinf(DEG2RAD(projectiles[i].angle)) * PROJECTILE_SPEED * Tdel;
             
-            if ( grid[(int)projectiles[i].x+100][(int)projectiles[i].y+100] )
+            int tmpx, tmpy;
+
+            tmpx = (int)(projectiles[i].x+100);
+            tmpy = (int)(projectiles[i].y+100);
+            
+            if ( grid[tmpx][tmpy] )
             {
                 projectiles[i].alive = false;
             }
