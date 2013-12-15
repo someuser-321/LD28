@@ -30,13 +30,11 @@
 #define MOUSE_SENSITIVITY 0.05f
 
 #define MAX_PROJECTILES 4096
-#define MAX_ENEMIES 1024
+#define MAX_ENEMIES 4096
 #define NUM_BUILDINGS 2048
 
 #define PROJECTILE_SPEED 8.0f
 #define ENEMY_SPEED 1.0f
-
-#define BUILDING_SEED 42
 
 
 #define sleepytime(x) for(int i=0;i<x;i++){}    // usleep and microsleep are too finicky...
@@ -104,6 +102,7 @@ int building_seed;
 int next_seed;
 
 int ticks = 0;
+double timer = 0.0f;
 
 
 void setup();
@@ -134,7 +133,7 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 int main(int argc, char *argv[])
 {
-    if ( argc == 2 ) {
+    if ( argc >= 2 ) {
         building_seed = atoi(argv[1]);
     } else {
         srand(time(NULL));
@@ -148,7 +147,7 @@ int main(int argc, char *argv[])
 
     glfwWindowHint(GLFW_SAMPLES, FXAA_SAMPLES);
 
-    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "LD28 - You only have one", NULL, NULL);
+    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "LD28 - You only get one", NULL, NULL);
     if ( !window )
     {
         glfwTerminate();
@@ -208,6 +207,8 @@ void setup()
         enemies[i].alive = false;
     }
     
+    glfwSetTime(0.0f);
+    timer = 0;
     
     rot_y = 0.0f;
     pos_x = 0.0f;
@@ -252,15 +253,23 @@ void step()
     
     if ( pos_x > 100 || pos_x < -100 || pos_z > 100 || pos_z < -100 )
     {
-        DIE("You fell off the edge and died. Good work. That was clever.");
+        DIE("You fell off the edge and died. Maybe that wasn't such a bad thing.");
+        glfwSetWindowShouldClose(window, GL_TRUE);
     }
     
-    if ( ticks%3 == 0)
+    if ( ticks%2 == 0)
         makeEnemies();
     if ( ticks%250 == 0 )
         enemy_speed++;
     
     ticks++;
+    
+    timer = glfwGetTime();
+    
+    if ( timer > 60 ) {
+        DIE("Time is up. Disappointing.");
+        glfwSetWindowShouldClose(window, GL_TRUE);
+    }
     
     moveEnemies();
     moveProjectiles();
@@ -269,7 +278,7 @@ void step()
     {
         score += objective.score;
         initial_enemy_speed *= 1.5f;
-        DIE("You got to the objective. What an extraordinarily adequate performance.");
+        DIE("You got to the objective. Maybe your parents will finally be proud of you.");
     }
 
     char title[256];
@@ -284,26 +293,26 @@ void get_input()
     }
     if ( glfwGetKey(window, 'W') == GLFW_PRESS ) {
         if ( !grid[(int)(pos_x+100)][(int)(pos_z-0.15f+100)] )
-            pos_z -= MOVEMENT_SPEED * Tdel;
+            pos_z -= movement_speed * Tdel;
     }
     if ( glfwGetKey(window, 'S') == GLFW_PRESS ) {
         if ( !grid[(int)(pos_x+100)][(int)ceil(pos_z+0.15f+100-1)] )
-            pos_z += MOVEMENT_SPEED * Tdel;
+            pos_z += movement_speed * Tdel;
     }
     if ( glfwGetKey(window, 'A') == GLFW_PRESS ) {
         if ( !grid[(int)(pos_x-0.15f+100)][(int)(pos_z+100)] )
-            pos_x -= MOVEMENT_SPEED * Tdel;
+            pos_x -= movement_speed * Tdel;
     }
     if ( glfwGetKey(window, 'D') == GLFW_PRESS ) {
         if ( !grid[(int)ceil(pos_x+0.15f+100-1)][(int)(pos_z+100)] )
-            pos_x += MOVEMENT_SPEED * Tdel;
+            pos_x += movement_speed * Tdel;
     }
     if ( glfwGetKey(window, 'E') == GLFW_PRESS ) {
         capture_cursor = !capture_cursor;
         sleepytime(31415926);
     }
     if ( glfwGetKey(window, 'R') == GLFW_PRESS ) {
-        DIE("Creating new level.");
+        DIE("Creating new level. Wuss...");
         sleepytime(31415926);
     }
     
@@ -313,10 +322,10 @@ void get_input()
     }
     
     if ( glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ) {
-        pos_y -= pos_y * MOVEMENT_SPEED * Tdel / 10.0f;
+        pos_y -= pos_y * movement_speed * Tdel / 10.0f;
     }
     if ( glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ) {
-        pos_y += pos_y * MOVEMENT_SPEED * Tdel / 10.0f;
+        pos_y += pos_y * movement_speed * Tdel / 10.0f;
     }
 
     if ( capture_cursor ) {
@@ -340,16 +349,16 @@ void get_input()
     if ( glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS ) {
         
         if ( !grid[(int)(pos_x+100)][(int)(pos_z-0.15f+100)] && rot_y > 0.0f ){         // W
-            pos_z -= sinf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+            pos_z -= sinf(DEG2RAD(rot_y)) * movement_speed * Tdel;
         }
         if ( !grid[(int)(pos_x+100)][(int)ceil(pos_z+0.2f+100-1)] && rot_y < 0.0f) {  // S
-            pos_z -= sinf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+            pos_z -= sinf(DEG2RAD(rot_y)) * movement_speed * Tdel;
         }
         if ( !grid[(int)(pos_x-0.2f+100)][(int)(pos_z+100)] && (rot_y > 90.0f || rot_y < -90.0f) ) {        // A
-            pos_x += cosf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+            pos_x += cosf(DEG2RAD(rot_y)) * movement_speed * Tdel;
         }
         if ( !grid[(int)ceil(pos_x+0.15f+100-1)][(int)(pos_z+100)] && rot_y < 90.0f && rot_y > -90.0f ) {  // D
-            pos_x += cosf(DEG2RAD(rot_y)) * MOVEMENT_SPEED * Tdel;
+            pos_x += cosf(DEG2RAD(rot_y)) * movement_speed * Tdel;
         }
     }
 }
@@ -490,6 +499,18 @@ void render()
     
     glEnd();
     
+    glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
+    glBegin(GL_LINE_STRIP);
+    
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glLineWidth(2.0f);
+        for ( float i=0 ; i<360*(1-timer/60) ; i+=360/60 )
+        {
+            glVertex3f(cosf(DEG2RAD(i))/2, 0.01f, sinf(DEG2RAD(i))/2);
+        }
+    
+    glEnd();
+    
     glPopMatrix();
 
     glPopMatrix();
@@ -589,7 +610,8 @@ void moveProjectiles()
             }
             if ( fabs(projectiles[i].x - pos_x) < 0.075f && fabs(projectiles[i].y - pos_z) < 0.075f )
             {
-                DIE("You walked right into that bullet. Well done. I bet your parents are proud.");
+                DIE("You just ran right into your own bullet. You cheating bastard.");
+                glfwSetWindowShouldClose(window, GL_TRUE);
                 break;
             }
             
@@ -647,6 +669,7 @@ void moveEnemies()
             if ( fabs(enemies[i].x - pos_x) < 0.1f && fabs(enemies[i].y - pos_z) < 0.1f )
             {
                 DIE("You gave that square a hug. He gave you a hug. Now you are dead. Congratulations.");
+                glfwSetWindowShouldClose(window, GL_TRUE);
             }
         }
     }
@@ -659,6 +682,7 @@ void DIE(char *message)
     
     building_seed = next_seed;
     enemy_speed = initial_enemy_speed;
+    movement_speed *= 1.075f;
 
     setup();
 }
