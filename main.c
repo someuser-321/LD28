@@ -17,8 +17,8 @@
 #define DSIN(x) sin(DEG2RAD(x))
 #define DCOS(x) cos(DEG2RAD(x))
 
-#define max(x, y) (x>y?x:y)
-#define min(x, y) (x<y?x:y)
+#define max(x,y) (x>y?x:y)
+#define min(x,y) (x<y?x:y)
 
 #define TIMEDEL60 (1/(double)60)
 #define FOV DEG2RAD(60.0f)
@@ -43,7 +43,6 @@
 
 typedef struct {
     float x, y;
-    float angle;
     int direction;
     bool alive;
 } Enemy;
@@ -75,7 +74,9 @@ float rot_y;
 float pos_x, pos_y, pos_z;
 int width, height;
 float ratio;
+
 double cursor_x, cursor_y;
+double cursor_dx, cursor_dy;
 
 bool capture_cursor = true;
 
@@ -90,11 +91,10 @@ bool grid[200][200];
 
 int numBuildings = 0;
 int numProjectiles = 0;
-int numEnemies = 0;
 int currentProjectile = 0;
 
 Objective objective;
-float score = 20.0f;
+float score = 0.0f;
 
 float enemy_speed = ENEMY_SPEED;
 float initial_enemy_speed = ENEMY_SPEED;
@@ -132,7 +132,7 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 int main(int argc, char *argv[])
 {
-    if ( argc > 1)
+    if ( argc == 2 )
         building_seed = atoi(argv[1]);
     
     glfwSetErrorCallback(error_callback);
@@ -210,12 +210,13 @@ void setup()
     do {
         objective.x = rand()%200-100;
         objective.y = rand()%200-100;
-        objective.score = objective.x + objective.y;
-    } while ( grid[(int)objective.x][(int)objective.y] );
+        objective.score = (objective.x + objective.y) * initial_enemy_speed;
+    } while ( (grid[(int)objective.x+100][(int)objective.y+100] || grid[(int)objective.x+100-1][(int)objective.y+100] ||
+              grid[(int)objective.x+100-1][(int)objective.y+100-1] || grid[(int)objective.x+100][(int)objective.y+100-1]) &&
+              (abs(objective.x) < 90 && abs(objective.y) < 90) );
     
     printf("Objective: x=%.2f, y=%.2f\n", objective.x, objective.y);
-    
-    numEnemies = 1;
+
     for ( int i=0 ; i<MAX_ENEMIES ; i++ )
     {
         enemies[i].alive = false;
@@ -266,10 +267,10 @@ void step()
     
     if ( pos_x > 100 || pos_x < -100 || pos_z > 100 || pos_z < -100 )
     {
-        DIE("You fell off the edge and died. That was clever.");
+        DIE("You fell off the edge and died. Good work. That was clever.");
     }
     
-    if ( ticks%5 == 0)
+    if ( ticks%3 == 0)
         makeEnemies();
     if ( ticks%250 == 0 )
         enemy_speed++;
@@ -279,12 +280,11 @@ void step()
     moveEnemies();
     moveProjectiles();
     
-    if ( fabs(pos_x - objective.x + 5) < 5.0f && fabs(pos_y - objective.y + 5) < 5.0f )
+    if ( fabs(pos_x - objective.x) < 1.0f && fabs(pos_z - objective.y) < 1.0f )
     {
-        DIE("You got to the objective. What an extraordinarily adequate performance.");
         score += objective.score;
         initial_enemy_speed *= 1.5f;
-        enemy_speed = initial_enemy_speed;
+        DIE("You got to the objective. What an extraordinarily adequate performance.");
     }
 
     char title[256];
@@ -323,7 +323,7 @@ void get_input()
     }
     
     if ( glfwGetKey(window, 'Q') == GLFW_PRESS ) {
-        printf("x=%.2f, y=%.2f, z=%.2f\n", pos_x, pos_y, pos_z);
+        printf("x=%.2f, (z)=%.2f, (y)=%.2f\n", pos_x, pos_y, pos_z);
     }
     
     if ( glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ) {
@@ -339,8 +339,18 @@ void get_input()
     }
 
     if ( capture_cursor ) {
-        glfwGetCursorPos(window, &cursor_x, &cursor_y);
-        rot_y = -1.0f*RAD2DEG(atan2(cursor_y-height/2, cursor_x-width/2));
+        glfwGetCursorPos(window, &cursor_dx, &cursor_dy);
+        
+        cursor_dx -= width/2;
+        cursor_dy -= height/2;
+        
+        if ( cursor_x+cursor_dx < 100 && cursor_x+cursor_dx > -100 )
+            cursor_x += cursor_dx;
+        if ( cursor_y+cursor_dy < 100 && cursor_y+cursor_dy > -100 )
+            cursor_y += cursor_dy;
+        
+        rot_y = -RAD2DEG(atan2(cursor_y, cursor_x));
+        glfwSetCursorPos(window, width/2, height/2);
     }
 }
 
@@ -374,15 +384,18 @@ void render()
 
     glColor3f(0.0f, 1.0f, 0.0f);
     glBegin(GL_QUADS);
-        glVertex3f(objective.x, 1.0f, objective.y);
-        glVertex3f(objective.x+10, 1.0f, objective.y+10);
-        glVertex3f(objective.x+10, 1.0f, objective.y+10);
-        glVertex3f(objective.x+10, 1.0f, objective.y+10);
+    
+        glVertex3f(objective.x-1.0f, -0.01f, objective.y-1.0f);
+        glVertex3f(objective.x-1.0f, -0.01f, objective.y+1.0f);
+        glVertex3f(objective.x+1.0f, -0.01f, objective.y+1.0f);
+        glVertex3f(objective.x+1.0f, -0.01f, objective.y-1.0f);
+        
     glEnd();
 
     glColor3f(0.8f, 0.8f, 0.8f);
     glLineWidth(1.0f);
     glBegin(GL_LINES);
+    
         glColor3f(5.0f/max(pos_y, 5), 5.0f/max(pos_y, 5), 5.0f/max(pos_y, 5));
         for ( int i=-100 ; i<100 ; i++ ) {
             glVertex3f(i, -0.1f, -100.0f);
@@ -392,11 +405,12 @@ void render()
             glVertex3f(-100.0f, -0.1f, j);
             glVertex3f(100.0f, -0.1f, j);
         }
+        
     glEnd();
     
+    glColor3f(1.0f, 0.0f, 0.0f);
     glBegin(GL_QUADS);
     
-        glColor3f(1.0f, 0.0f, 0.0f);
         for ( int i=0 ; i<MAX_ENEMIES ; i++ )
         {
             if ( enemies[i].alive )
@@ -405,18 +419,19 @@ void render()
                 float y = enemies[i].y;
 
                 glPushMatrix();
-                glRotatef(enemies[i].angle, 0.0f, 1.0f, 0.0f);
-                glVertex3f(-0.075f + x, 0.0f, -0.075f + y);
-                glVertex3f(-0.075f + x, 0.0f,  0.075f + y);
-                glVertex3f( 0.075f + x, 0.0f,  0.075f + y);
-                glVertex3f( 0.075f + x, 0.0f, -0.075f + y);
+                glVertex3f(-0.1f + x, 0.0f, -0.1f + y);
+                glVertex3f(-0.1f + x, 0.0f,  0.1f + y);
+                glVertex3f( 0.1f + x, 0.0f,  0.1f + y);
+                glVertex3f( 0.1f + x, 0.0f, -0.1f + y);
                 glPopMatrix();
             }
         }
+        
     glEnd();
     
     glPointSize(2.0f);
     glBegin(GL_POINTS);
+    
         for ( int i=0 ; i<numProjectiles ; i++ )
         {
             if ( projectiles[i].alive )
@@ -428,8 +443,8 @@ void render()
                 glColor3f(1.0f, 1.0f/d, 1.0f/d);
                 glVertex3f(x, 0.0f, y);
             }
-            
         }
+        
     glEnd();
     
     glBegin(GL_QUADS);
@@ -439,7 +454,6 @@ void render()
     glPushMatrix();
     
     glTranslatef(pos_x, 0.0f, pos_z);
-    glPushMatrix();
     glRotatef(rot_y, 0.0f, 1.0f, 0.0f);
     
     glColor3f(0.4f, 0.6f, 1.0f);
@@ -448,21 +462,21 @@ void render()
     glVertex3f(0.0f, 0.0f, 0.0f);
     glEnd();
     glBegin(GL_QUADS);
-        glVertex3f(-0.075f, 0.0f, -0.075f);
-        glVertex3f(-0.075f, 0.0f,  0.075f);
-        glVertex3f( 0.075f, 0.0f,  0.075f);
-        glVertex3f( 0.075f, 0.0f, -0.075f);
+    
+        glVertex3f(-0.1f, 0.0f, -0.1f);
+        glVertex3f(-0.1f, 0.0f,  0.1f);
+        glVertex3f( 0.1f, 0.0f,  0.1f);
+        glVertex3f( 0.1f, 0.0f, -0.1f);
+        
     glEnd();
-
-    glPopMatrix();
-
-    // FIX ME!!! ARRRRRRRRRRRRRRRRRRRRRRGH!!!!!!
-    glTranslatef((cursor_x-width/2)/width*12.5f/ratio, 0.0f, (cursor_y-height/2)/height*12.5f/ratio);
-
-    glPointSize(5.0f);
-    glBegin(GL_POINTS);
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
+    
+    glBegin(GL_LINES);
+    
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glVertex3f( 0.0f, 0.0f, 0.0f);
+        glColor3f(0.1f, 0.1f, 0.1f);
+        glVertex3f(10.0f, 0.0f, 0.0f);
+    
     glEnd();
 
     glPopMatrix();
@@ -575,6 +589,7 @@ void moveProjectiles()
                 {
                     if ( fabs(projectiles[i].x - enemies[j].x) < 0.1f && fabs(projectiles[i].y - enemies[j].y) < 0.1f ) {
                         enemies[j].alive = false;
+                        score += initial_enemy_speed;
                         break;
                     }
                 }
@@ -621,7 +636,7 @@ void moveEnemies()
             
             if ( fabs(enemies[i].x - pos_x) < 0.1f && fabs(enemies[i].y - pos_z) < 0.1f )
             {
-                DIE("You just walked into that enemy. He gave you a big hug. Now you are dead.");
+                DIE("You just moved directly into that enemy. He gave you a big hug. Now you are dead.");
             }
         }
     }
@@ -630,17 +645,11 @@ void moveEnemies()
 void DIE(char *message)
 {
     printf("%s\n", message);
+    
     building_seed = next_seed;
-    next_seed = rand();
-    makeBuildings(numBuildings);
-    pos_x = pos_z = 0;
-    pos_y = 8.0f;
-    
-    for ( int i=0 ; i<MAX_PROJECTILES ; i++ )
-        projectiles[i].alive = false;
-    for ( int i=0 ; i<MAX_ENEMIES ; i++ )
-        enemies[i].alive = false;
-    
+    enemy_speed = initial_enemy_speed;
+
+    setup();
 }
 
 void drawBuildings()
