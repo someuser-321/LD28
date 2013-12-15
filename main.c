@@ -29,10 +29,11 @@
 #define MOUSE_SENSITIVITY 0.05f
 
 #define MAX_PROJECTILES 4096
-#define MAX_ENEMIES 32
+#define MAX_ENEMIES 1024
 #define NUM_BUILDINGS 2048
 
 #define PROJECTILE_SPEED 8.0f
+#define ENEMY_SPEED 1.0f
 
 #define BUILDING_SEED 42
 
@@ -43,7 +44,7 @@
 typedef struct {
     float x, y;
     float angle;
-    int obj_x, obj_y;
+    int direction;
     bool alive;
 } Enemy;
 
@@ -59,6 +60,11 @@ typedef struct {
     float x_, y_;
     float height;
 } Building;
+
+typedef struct {
+    float x, y;
+    float score;
+} Objective;
 
 
 GLFWwindow *window;
@@ -87,6 +93,12 @@ int numProjectiles = 0;
 int numEnemies = 0;
 int currentProjectile = 0;
 
+Objective objective;
+float score = 20.0f;
+
+float enemy_speed = ENEMY_SPEED;
+float initial_enemy_speed = ENEMY_SPEED;
+
 int building_seed = BUILDING_SEED;
 int next_seed;
 
@@ -97,7 +109,7 @@ void setup();
 void render_setup();
 
 void makeBuildings(int buildingCount);
-void makeEnemy();
+void makeEnemies();
 void addProjectile(float x, float y);
 
 void step();
@@ -195,6 +207,20 @@ void setup()
     
     grid[100+2][100-2] = true;*/
     
+    do {
+        objective.x = rand()%200-100;
+        objective.y = rand()%200-100;
+        objective.score = objective.x + objective.y;
+    } while ( grid[(int)objective.x][(int)objective.y] );
+    
+    printf("Objective: x=%.2f, y=%.2f\n", objective.x, objective.y);
+    
+    numEnemies = 1;
+    for ( int i=0 ; i<MAX_ENEMIES ; i++ )
+    {
+        enemies[i].alive = false;
+    }
+    
     
     rot_y = 0.0f;
     pos_x = 0.0f;
@@ -243,14 +269,25 @@ void step()
         DIE("You fell off the edge and died. That was clever.");
     }
     
-    if ( ticks%10 == 0)
-        makeEnemy();
+    if ( ticks%5 == 0)
+        makeEnemies();
+    if ( ticks%250 == 0 )
+        enemy_speed++;
+    
     ticks++;
     
     moveEnemies();
     moveProjectiles();
+    
+    if ( fabs(pos_x - objective.x + 5) < 5.0f && fabs(pos_y - objective.y + 5) < 5.0f )
+    {
+        DIE("You got to the objective. What an extraordinarily adequate performance.");
+        score += objective.score;
+        initial_enemy_speed *= 1.5f;
+        enemy_speed = initial_enemy_speed;
+    }
 
-    char title[64];
+    char title[256];
     snprintf(title, 64, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
     glfwSetWindowTitle(window, title);
 }
@@ -281,7 +318,7 @@ void get_input()
         sleepytime(31415926);
     }
     if ( glfwGetKey(window, 'R') == GLFW_PRESS ) {
-        pos_x = 9001.0f;
+        DIE("Creating new level.");
         sleepytime(31415926);
     }
     
@@ -290,8 +327,8 @@ void get_input()
     }
     
     if ( glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ) {
-        addProjectile(pos_x+cosf(DEG2RAD(-rot_y))/4, pos_z+sinf(DEG2RAD(-rot_y))/4);
-        sleepytime(3141592);
+        if ( ticks%5 == 0 )
+            addProjectile(pos_x+cosf(DEG2RAD(-rot_y))/4, pos_z+sinf(DEG2RAD(-rot_y))/4);
     }
 
     if ( glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ) {
@@ -318,7 +355,7 @@ void render()
     glTranslatef(-pos_x, -pos_y, -pos_z);
     
     
-    glLineWidth(1.0f);
+    /*glLineWidth(1.0f);
     glBegin(GL_LINES);
 
         glColor3f(1.0f, 0.0f, 0.0f);
@@ -333,24 +370,34 @@ void render()
         glVertex3f(0.0f, 0.0f, 0.0f);
         glVertex3f(0.0f, 0.0f, 1.0f);
 
+    glEnd();*/
+
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glBegin(GL_QUADS);
+        glVertex3f(objective.x, 1.0f, objective.y);
+        glVertex3f(objective.x+10, 1.0f, objective.y+10);
+        glVertex3f(objective.x+10, 1.0f, objective.y+10);
+        glVertex3f(objective.x+10, 1.0f, objective.y+10);
     glEnd();
 
     glColor3f(0.8f, 0.8f, 0.8f);
+    glLineWidth(1.0f);
     glBegin(GL_LINES);
+        glColor3f(5.0f/max(pos_y, 5), 5.0f/max(pos_y, 5), 5.0f/max(pos_y, 5));
         for ( int i=-100 ; i<100 ; i++ ) {
-            glVertex3f(i, 0.0f, -100.0f);
-            glVertex3f(i, 0.0f,  100.0f);
+            glVertex3f(i, -0.1f, -100.0f);
+            glVertex3f(i, -0.1f,  100.0f);
         }
         for ( int j=-100 ; j<100 ; j++ ) {
-            glVertex3f(-100.0f, 0.0f, j);
-            glVertex3f(100.0f, 0.0f, j);
+            glVertex3f(-100.0f, -0.1f, j);
+            glVertex3f(100.0f, -0.1f, j);
         }
     glEnd();
     
     glBegin(GL_QUADS);
     
         glColor3f(1.0f, 0.0f, 0.0f);
-        for ( int i=0 ; i<numEnemies ; i++ )
+        for ( int i=0 ; i<MAX_ENEMIES ; i++ )
         {
             if ( enemies[i].alive )
             {
@@ -359,10 +406,10 @@ void render()
 
                 glPushMatrix();
                 glRotatef(enemies[i].angle, 0.0f, 1.0f, 0.0f);
-                glVertex3f(-0.05f + x, 0.0f, -0.05f + y);
-                glVertex3f(-0.05f + x, 0.0f,  0.05f + y);
-                glVertex3f( 0.05f + x, 0.0f,  0.05f + y);
-                glVertex3f( 0.05f + x, 0.0f, -0.05f + y);
+                glVertex3f(-0.075f + x, 0.0f, -0.075f + y);
+                glVertex3f(-0.075f + x, 0.0f,  0.075f + y);
+                glVertex3f( 0.075f + x, 0.0f,  0.075f + y);
+                glVertex3f( 0.075f + x, 0.0f, -0.075f + y);
                 glPopMatrix();
             }
         }
@@ -406,8 +453,9 @@ void render()
         glVertex3f( 0.075f, 0.0f,  0.075f);
         glVertex3f( 0.075f, 0.0f, -0.075f);
     glEnd();
+
     glPopMatrix();
-    
+
     // FIX ME!!! ARRRRRRRRRRRRRRRRRRRRRRGH!!!!!!
     glTranslatef((cursor_x-width/2)/width*12.5f/ratio, 0.0f, (cursor_y-height/2)/height*12.5f/ratio);
 
@@ -463,18 +511,21 @@ void makeBuildings(int buildingCount)
     }
 }
 
-void makeEnemy()
+void makeEnemies()
 {
     int i;
-    for ( i=0 ; i<numEnemies ; i++ ) {
-        if ( !enemies[i].alive ) {
-            int x = (int)pos_x + rand()%16 - 8;
-            int y = (int)pos_y + rand()%16 - 8;
-    
+    for ( i=0 ; i<MAX_ENEMIES ; i++ )
+    {
+        if ( !enemies[i].alive )
+        {
+            int x = (int)pos_x + (rand()%6 + 4) * -1*((rand()%2)*2-1);
+            int y = (int)pos_z + (rand()%6 + 4) * -1*((rand()%2)*2-1);
+
             enemies[i].x = x;
             enemies[i].y = y;
-            enemies[i].angle = RAD2DEG(atan2(pos_y-y, pos_x-x));
+            enemies[i].direction = rand()%4;
             enemies[i].alive = true;
+
             break;
         }
     }
@@ -518,11 +569,11 @@ void moveProjectiles()
                 break;
             }
             
-            for ( int j=0 ; j<numEnemies ; j++ )
+            for ( int j=0 ; j<MAX_ENEMIES ; j++ )
             {
                 if ( enemies[j].alive )
                 {
-                    if ( fabs(projectiles[i].x - enemies[j].x) < 0.25f && fabs(projectiles[i].y - enemies[j].y) < 0.25f ) {
+                    if ( fabs(projectiles[i].x - enemies[j].x) < 0.1f && fabs(projectiles[i].y - enemies[j].y) < 0.1f ) {
                         enemies[j].alive = false;
                         break;
                     }
@@ -536,23 +587,42 @@ void moveProjectiles()
 
 void moveEnemies()
 {
-    for ( int i=0 ; i<numEnemies ; i++ )
+    for ( int i=0 ; i<MAX_ENEMIES ; i++ )
     {
         if ( enemies[i].alive )
         {
-            float x = enemies[i].x;
-            float y = enemies[i].y;
-            float angle = enemies[i].angle;
-            
-            if ( (angle < 45.0f && angle > -45.0f) || (angle > 135.0f && angle < -135.0f) ) {
-                //movesideways
-                enemies[i].x -= (pos_x - x)/4 * Tdel;
-            } else {
-                //moveupdown
-                enemies[i].y -= (pos_y - y)/4 * Tdel;
+            switch ( enemies[i].direction ) {
+                case 0:
+                    enemies[i].x += enemy_speed * Tdel;
+                    break;
+                case 1:
+                    enemies[i].y += enemy_speed * Tdel;
+                    break;
+                case 2:
+                    enemies[i].x -= enemy_speed * Tdel;
+                    break;
+                default:
+                    enemies[i].y -= enemy_speed * Tdel;
+                    break;
             }
             
-            enemies[i].angle = RAD2DEG(atan2(pos_y-y, pos_x-x));
+            if ( fabs(enemies[i].x - pos_x) > 32 || fabs(enemies[i].y - pos_z) > 32 ) {
+                enemies[i].alive = false;
+                break;
+            }
+            if ( fabs(enemies[i].x) > 98 || fabs(enemies[i].y) > 98 ) {
+                enemies[i].alive = false;
+                break;
+            }
+            if ( grid[(int)enemies[i].x+100][(int)enemies[i].y+100] ) {
+                enemies[i].alive = false;
+                break;
+            }
+            
+            if ( fabs(enemies[i].x - pos_x) < 0.1f && fabs(enemies[i].y - pos_z) < 0.1f )
+            {
+                DIE("You just walked into that enemy. He gave you a big hug. Now you are dead.");
+            }
         }
     }
 }
@@ -584,25 +654,25 @@ void drawBuildings()
         float height = buildings[i].height;
         
         glColor3f(0.5f, 0.5f, 0.5f);
-        glVertex3f(x, 0.0f,  y);
+        glVertex3f(x, -0.1f,  y);
         glVertex3f(x, height, y);
         glVertex3f(x, height, y_);
-        glVertex3f(x, 0.0f,  y_);
+        glVertex3f(x, -0.1f,  y_);
     
-        glVertex3f(x, 0.0f,  y_);
+        glVertex3f(x, -0.1f,  y_);
         glVertex3f(x, height, y_);
         glVertex3f(x_, height, y_);
-        glVertex3f(x_, 0.0f,  y_);
+        glVertex3f(x_, -0.1f,  y_);
     
-        glVertex3f(x_, 0.0f,  y);
+        glVertex3f(x_, -0.1f,  y);
         glVertex3f(x_, height, y);
         glVertex3f(x_, height, y_);
-        glVertex3f(x_, 0.0f,  y_);
+        glVertex3f(x_, -0.1f,  y_);
     
-        glVertex3f(x, 0.0f,  y);
+        glVertex3f(x, -0.1f,  y);
         glVertex3f(x, height, y);
         glVertex3f(x_, height, y);
-        glVertex3f(x_, 0.0f,  y);
+        glVertex3f(x_, -0.1f,  y);
         
         glColor3f(0.45f, 0.45f, 0.45f);
         glVertex3f(x , height,  y);
@@ -630,13 +700,13 @@ void drawBuildings()
         glVertex3f(x_, height, y);//
         glVertex3f(x_, height, y_);
         
-        glVertex3f(x, 0.0f, y);//
+        glVertex3f(x, -0.1f, y);//
         glVertex3f(x, height, y);
-        glVertex3f(x, 0.0f, y_);//
+        glVertex3f(x, -0.1f, y_);//
         glVertex3f(x, height, y_);
-        glVertex3f(x_, 0.0f, y_);//
+        glVertex3f(x_, -0.1f, y_);//
         glVertex3f(x_, height, y_);
-        glVertex3f(x_, 0.0f, y);//
+        glVertex3f(x_, -0.1f, y);//
         glVertex3f(x_, height, y);
     }
     glEnd();
