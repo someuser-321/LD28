@@ -4,13 +4,13 @@
 C99 = gcc -std=c99 -Wall -Werror -pedantic
 LIBS = -lGL -lGLU -lglfw3 -lm -lX11 -lXxf86vm -lXrandr -lpthread -lXi
 
-all: YOGO
+all: yogo
 
-YOGO: main.o
-	$(C99) main.o -g $(LIBS) -o YOGO
+yogo: yogo.o
+	$(C99) yogo.o -g $(LIBS) -o yogo
 
-main.o: main.c
-	$(C99) -g -c main.c
+yogo.o: yogo.c
+	$(C99) -g -c yogo.c
 
 clean:
-	rm -f main.o YOGO
+	rm -f yogo.o yogo

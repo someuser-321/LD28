@@ -95,12 +95,12 @@ int numProjectiles = 0;
 int currentProjectile = 0;
 
 Objective objective;
-float score = 0.0f;
+int score = 0;
 
 float enemy_speed = ENEMY_SPEED;
 float initial_enemy_speed = ENEMY_SPEED;
 
-int building_seed;// = BUILDING_SEED;
+int building_seed;
 int next_seed;
 
 int ticks = 0;
@@ -160,8 +160,9 @@ int main(int argc, char *argv[])
     printf("You Only Get One - LD28\n\n");
     printf("The aim of this game is to fight your way through the red squares to the objective marker indicated by the green line. ");
     printf("You only get one minute.\n\n");
-    printf("Controls (YOGO/classic)  :\n\tmouse: aim\n\tleft-click: shoot\n\tright-click: move forward\n\tscroll: zoom\n\n");
-    printf("Controls (casual):\n\tWASD: movement\n\tmouse: aim\n\tspace: shoot\n\tscroll/shift/ctrl: zoom\n(E to release/recapture mouse)\n\n");
+    printf("Controls (YOGO/classic):\n\tmouse: aim\n\tleft-click: shoot\n\tright-click: move forward\n\tscroll: zoom\n");
+    printf("Controls (casual):\n\tWASD: movement\n\tmouse: aim\n\tspace: shoot\n\tscroll/shift/ctrl: zoom\n");
+    printf("R to generate a new level\nE to release/recapture mouse\nESC to exit\n\n");
     printf("Have fun! Made by Chris Harrison (and coffee), December 2013\n\n");
     
     pos_y = 8.0f;
@@ -197,7 +198,7 @@ void setup()
     do {
         objective.x = rand()%200-100;
         objective.y = rand()%200-100;
-        objective.score = (objective.x + objective.y) * initial_enemy_speed;
+        objective.score = (abs(objective.x) + abs(objective.y)) * initial_enemy_speed;
     } while ( (grid[(int)objective.x+100][(int)objective.y+100] || grid[(int)objective.x+100-1][(int)objective.y+100] ||
               grid[(int)objective.x+100-1][(int)objective.y+100-1] || grid[(int)objective.x+100][(int)objective.y+100-1]) &&
               (abs(objective.x) < 90 && abs(objective.y) < 90) );
@@ -210,7 +211,6 @@ void setup()
     
     rot_y = 0.0f;
     pos_x = 0.0f;
-    //pos_y = 8.0f;
     pos_z = 0.0f;
 
 }
@@ -307,15 +307,11 @@ void get_input()
         sleepytime(31415926);
     }
     
-    if ( glfwGetKey(window, 'Q') == GLFW_PRESS ) {
-        printf("x=%.2f, (z)=%.2f, (y)=%.2f\n", pos_x, pos_y, pos_z);
-    }
-    
     if ( glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ) {
         if ( ticks%5 == 0 )
             addProjectile(pos_x+cosf(DEG2RAD(-rot_y))/4, pos_z+sinf(DEG2RAD(-rot_y))/4);
     }
-
+    
     if ( glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ) {
         pos_y -= pos_y * MOVEMENT_SPEED * Tdel / 10.0f;
     }
@@ -463,7 +459,7 @@ void render()
         glColor3f(1.0f, 1.0f, 1.0f);
         glVertex3f( 0.0f, 0.0f, 0.0f);
         glColor3f(0.1f, 0.1f, 0.1f);
-        glVertex3f(10.0f, 0.0f, 0.0f);
+        glVertex3f(5.0f, 0.0f, 0.0f);
     
     glEnd();
 
@@ -473,14 +469,27 @@ void render()
     float dy = objective.y - pos_z;
     
     float a = atan2(dy, dx);
-    float d = min(sqrtf(dy*dy+dx*dx), 10.0f);
+    float d = min(sqrtf(dy*dy+dx*dx), 5.0f);
     
     glBegin(GL_LINES);
+    
         glColor3f(0.0f, 1.0f, 0.0f);
         glVertex3f(0.0f, 0.0f, 0.0f);
         glColor3f(0.0f, 0.0f, 0.0f);
         glVertex3f(d*cos(a), 0.0f, d*sin(a));
+        
     glEnd();
+    
+    glBegin(GL_QUADS);
+    
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(-width/2+10, 0.0f, -height/2+10);
+        glVertex3f(-width/2+10+score, 0.0f, -height/2+10);
+        glVertex3f(-width/2+10+score, 0.0f, -height/2+10+10);
+        glVertex3f(-width/2+10, 0.0f, -height/2+10+10);
+    
+    glEnd();
+    
     glPopMatrix();
 
     glPopMatrix();
@@ -637,7 +646,7 @@ void moveEnemies()
             
             if ( fabs(enemies[i].x - pos_x) < 0.1f && fabs(enemies[i].y - pos_z) < 0.1f )
             {
-                DIE("You just moved directly into that enemy. He gave you a big hug. Now you are dead.");
+                DIE("You gave that square a hug. He gave you a hug. Now you are dead. Congratulations.");
             }
         }
     }
@@ -646,6 +655,7 @@ void moveEnemies()
 void DIE(char *message)
 {
     printf("%s\n", message);
+    printf("Score: %i\n", score);
     
     building_seed = next_seed;
     enemy_speed = initial_enemy_speed;
