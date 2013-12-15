@@ -158,10 +158,10 @@ int main(int argc, char *argv[])
     glfwSetScrollCallback(window, scroll_callback);
     
     printf("You Only Get One - LD28\n\n");
-    printf("The aim of this game is to fight your way through the red squares to the gree objective marker indicated by the green line.\n");
-    printf("Everything else should be self-explanatory.\n\n");
-    printf("Controls (YOGO)  :\n\tmouse: aim\n\tleft-click: shoot\n\tright-click: move forward\n\tscroll: zoom\n\n");
-    printf("Controls (casual):\n\tWASD: movement\n\tmouse: aim\n\tspace: shoot\n\tscroll/shift/ctrl: zoom\n\n");
+    printf("The aim of this game is to fight your way through the red squares to the objective marker indicated by the green line. ");
+    printf("You only get one minute.\n\n");
+    printf("Controls (YOGO/classic)  :\n\tmouse: aim\n\tleft-click: shoot\n\tright-click: move forward\n\tscroll: zoom\n\n");
+    printf("Controls (casual):\n\tWASD: movement\n\tmouse: aim\n\tspace: shoot\n\tscroll/shift/ctrl: zoom\n(E to release/recapture mouse)\n\n");
     printf("Have fun! Made by Chris Harrison (and coffee), December 2013\n\n");
     
     pos_y = 8.0f;
@@ -367,24 +367,6 @@ void render()
 
     glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
     glTranslatef(-pos_x, -pos_y, -pos_z);
-    
-    
-    /*glLineWidth(1.0f);
-    glBegin(GL_LINES);
-
-        glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(1.0f, 0.0f, 0.0f);
-
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 1.0f, 0.0f);
-
-        glColor3f(0.0f, 0.0f, 1.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 1.0f);
-
-    glEnd();*/
 
     glColor3f(0.0f, 1.0f, 0.0f);
     glBegin(GL_QUADS);
@@ -458,6 +440,8 @@ void render()
     glPushMatrix();
     
     glTranslatef(pos_x, 0.0f, pos_z);
+    glPushMatrix();
+    
     glRotatef(rot_y, 0.0f, 1.0f, 0.0f);
     
     glColor3f(0.4f, 0.6f, 1.0f);
@@ -484,7 +468,20 @@ void render()
     glEnd();
 
     glPopMatrix();
-
+    
+    float dx = objective.x - pos_x;
+    float dy = objective.y - pos_z;
+    
+    float a = atan2(dy, dx);
+    float d = min(sqrtf(dy*dy+dx*dx), 10.0f);
+    
+    glBegin(GL_LINES);
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glColor3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(d*cos(a), 0.0f, d*sin(a));
+    glEnd();
+    glPopMatrix();
 
     glPopMatrix();
     glfwSwapBuffers(window);
