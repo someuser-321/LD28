@@ -1,6 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
+
+#ifndef _WIN32
+	#include <stdbool.h>
+#else
+	#define bool int
+	#define true 1
+	#define false 0
+#endif
+
 #include <math.h>
 #include <time.h>
 
@@ -175,8 +183,9 @@ int main(int argc, char *argv[])
         render();
     }
 
-
+    
     cleanup();
+    system("pause");
     exit(EXIT_SUCCESS);
 }
 
@@ -202,8 +211,8 @@ void setup()
               grid[(int)objective.x+100-1][(int)objective.y+100-1] || grid[(int)objective.x+100][(int)objective.y+100-1]) &&
               (abs(objective.x) < 90 && abs(objective.y) < 90) );
 
-    for ( int i=0 ; i<MAX_ENEMIES ; i++ )
-    {
+	int i;
+    for ( i=0 ; i<MAX_ENEMIES ; i++ ) {
         enemies[i].alive = false;
     }
     
@@ -249,7 +258,7 @@ void render_setup()
 void step()
 {
     glfwPollEvents();
-    get_input(window);
+    get_input();
     
     if ( pos_x > 100 || pos_x < -100 || pos_z > 100 || pos_z < -100 )
     {
@@ -278,11 +287,15 @@ void step()
     {
         score += objective.score;
         initial_enemy_speed *= 1.5f;
-        DIE("You got to the objective. Maybe your parents will finally be proud of you.");
+        DIE("You got to the objective. Your parents will finally be proud of you.");
     }
 
     char title[256];
-    snprintf(title, 64, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
+    #ifdef _WIN32
+        sprintf_s(title, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
+    #else
+        snprintf(title, 256, "LD28 - You only have one @ %.1f FPS", (float)getFPS());
+    #endif
     glfwSetWindowTitle(window, title);
 }
 
@@ -387,22 +400,21 @@ void render()
     glLineWidth(1.0f);
     glBegin(GL_LINES);
     
+        int i;
         glColor3f(5.0f/max(pos_y, 4), 5.0f/max(pos_y, 4), 5.0f/max(pos_y, 4));
-        for ( int i=-100 ; i<100 ; i++ ) {
+        for ( i=-100 ; i<100 ; i++ ) {
             glVertex3f(i, -0.1f, -100.0f);
             glVertex3f(i, -0.1f,  100.0f);
-        }
-        for ( int j=-100 ; j<100 ; j++ ) {
-            glVertex3f(-100.0f, -0.1f, j);
-            glVertex3f(100.0f, -0.1f, j);
+            glVertex3f(-100.0f, -0.1f, i);
+            glVertex3f(100.0f, -0.1f, i);
         }
         
     glEnd();
     
     glColor3f(1.0f, 0.0f, 0.0f);
     glBegin(GL_QUADS);
-    
-        for ( int i=0 ; i<MAX_ENEMIES ; i++ )
+
+        for ( i=0 ; i<MAX_ENEMIES ; i++ )
         {
             if ( enemies[i].alive )
             {
@@ -504,9 +516,11 @@ void render()
     
         glColor3f(1.0f, 1.0f, 1.0f);
         glLineWidth(2.0f);
-        for ( float i=0 ; i<360*(1-timer/60) ; i+=360/60 )
+
+        float k;
+        for ( float k=0 ; k<360*(1-timer/60) ; k+=360/60 )
         {
-            glVertex3f(cosf(DEG2RAD(i))/2, 0.01f, sinf(DEG2RAD(i))/2);
+            glVertex3f(cosf(DEG2RAD(k))/2, 0.01f, sinf(DEG2RAD(k))/2);
         }
     
     glEnd();
@@ -519,13 +533,14 @@ void render()
 
 void makeBuildings(int buildingCount)
 {
-    for ( int i=0 ; i<200 ; i++ ) {
-        for ( int j=0 ; j<200 ; j++ ) {
+    int i, j;
+    for ( i=0 ; i<200 ; i++ ) {
+        for ( j=0 ; j<200 ; j++ ) {
             grid[i][j] = false;
         }
     }
     
-    for ( int i=0 ; i<buildingCount ; i++ )
+    for ( i=0 ; i<buildingCount ; i++ )
     {
         Building tmp;
         tmp.x = rand()%200 - 100;
@@ -546,9 +561,10 @@ void makeBuildings(int buildingCount)
         tmp.x_ = (tmp.x + ds) > 100 ? 100 : (tmp.x + ds);
         tmp.y_ = (tmp.y + ds) > 100 ? 100 : (tmp.y + ds);
         
-        for ( int i=floor(tmp.x) ; i<floor(tmp.x_) ; i++ ) {
-            for ( int j=floor(tmp.y) ; j<floor(tmp.y_) ; j++ ) {
-                grid[i+100][j+100] = true;
+        for ( j=floor(tmp.x) ; j<floor(tmp.x_) ; j++ ) {
+            int k;
+            for ( k=floor(tmp.y) ; k<floor(tmp.y_) ; k++ ) {
+                grid[j+100][k+100] = true;
             }
         }
         
@@ -592,7 +608,8 @@ void addProjectile(float x, float y)
 
 void moveProjectiles()
 {
-    for ( int i=0 ; i<numProjectiles ; i++ )
+    int i;
+    for ( i=0 ; i<numProjectiles ; i++ )
     {
         if ( projectiles[i].alive )
         {
@@ -603,6 +620,11 @@ void moveProjectiles()
 
             tmpx = (int)(projectiles[i].x+100);
             tmpy = (int)(projectiles[i].y+100);
+
+            if ( abs(projectiles[i].x) > 98 || abs(projectiles[i].y) > 98 ) {
+                projectiles[i].alive = false;
+                continue;
+            }
             
             if ( grid[tmpx][tmpy] )
             {
@@ -615,7 +637,8 @@ void moveProjectiles()
                 break;
             }
             
-            for ( int j=0 ; j<MAX_ENEMIES ; j++ )
+            int j;
+            for ( j=0 ; j<MAX_ENEMIES ; j++ )
             {
                 if ( enemies[j].alive )
                 {
@@ -634,7 +657,8 @@ void moveProjectiles()
 
 void moveEnemies()
 {
-    for ( int i=0 ; i<MAX_ENEMIES ; i++ )
+    int i;
+    for ( i=0 ; i<MAX_ENEMIES ; i++ )
     {
         if ( enemies[i].alive )
         {
@@ -690,7 +714,9 @@ void DIE(char *message)
 void drawBuildings()
 {
     glBegin(GL_QUADS);
-    for ( int i=0 ; i<numBuildings ; i++ ) {
+
+    int i;
+    for ( i=0 ; i<numBuildings ; i++ ) {
         float x = buildings[i].x;
         float y = buildings[i].y;
         float x_ = buildings[i].x_;
@@ -728,7 +754,7 @@ void drawBuildings()
     
     glColor3f(0.0f, 0.0f, 0.0f);
     glBegin(GL_LINES);
-    for ( int i=0 ; i<numBuildings ; i++ ) {
+    for ( i=0 ; i<numBuildings ; i++ ) {
         float x = buildings[i].x;
         float y = buildings[i].y;
         float x_ = buildings[i].x_;
