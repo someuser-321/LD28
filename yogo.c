@@ -4,6 +4,7 @@
 #ifndef _WIN32
 	#include <stdbool.h>
 #else
+    #include <windows.h>
 	#define bool int
 	#define true 1
 	#define false 0
@@ -44,9 +45,11 @@
 #define PROJECTILE_SPEED 8.0f
 #define ENEMY_SPEED 1.0f
 
-
-#define sleepytime(x) for(int i=0;i<x;i++){}    // usleep and microsleep are too finicky...
-                                                // I apologize if you have a terrible computer
+#ifndef _WIN32
+    #define sleepytime(x) for(int i=0;i<x;i++){}    // usleep and microsleep are too finicky...
+#else                                               // I apologize if you have a terrible computer
+    #define sleepytime(x) Sleep(500)
+#endif
 
 typedef struct {
     float x, y;
@@ -238,16 +241,16 @@ void render_setup()
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
-    float near = 0.01;
-    float far = 1000.0f;
+    float near_ = 0.01f;
+    float far_ = 1000.0f;
 
-    float top = tanf(FOV*0.5) * near;
+    float top = tanf(FOV*0.5) * near_;
     float bottom = -1*top;
 
     float left = ratio * bottom;
     float right = ratio * top;
 
-    glFrustum(left, right, bottom, top, near, far);
+    glFrustum(left, right, bottom, top, near_, far_);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -268,8 +271,8 @@ void step()
     
     if ( ticks%2 == 0)
         makeEnemies();
-    if ( ticks%250 == 0 )
-        enemy_speed++;
+    if ( ticks%500 == 0 )
+        enemy_speed += 0.5f;
     
     ticks++;
     
@@ -287,6 +290,7 @@ void step()
     {
         score += objective.score;
         initial_enemy_speed *= 1.5f;
+        movement_speed *= 1.075f;
         DIE("You got to the objective. Your parents will finally be proud of you.");
     }
 
@@ -322,11 +326,10 @@ void get_input()
     }
     if ( glfwGetKey(window, 'E') == GLFW_PRESS ) {
         capture_cursor = !capture_cursor;
-        sleepytime(31415926);
+        sleepytime(999999999);
     }
     if ( glfwGetKey(window, 'R') == GLFW_PRESS ) {
         DIE("Creating new level. Wuss...");
-        sleepytime(31415926);
     }
     
     if ( glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ) {
@@ -704,9 +707,10 @@ void DIE(char *message)
     printf("%s\n", message);
     printf("Score: %i\n", score);
     
+    sleepytime(99999999);
+    
     building_seed = next_seed;
     enemy_speed = initial_enemy_speed;
-    movement_speed *= 1.075f;
 
     setup();
 }
